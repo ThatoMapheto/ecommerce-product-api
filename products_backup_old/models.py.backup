@@ -1,0 +1,109 @@
+from django.db import models
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
+
+
+class ServiceCategory(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+    description = models.TextField()
+    # FontAwesome icon class
+    icon = models.CharField(max_length=50, blank=True)
+
+    class Meta:
+        verbose_name_plural = "Service Categories"
+
+    def __str__(self):
+        return self.name
+
+
+class Service(models.Model):
+    SERVICE_TYPES = [
+        ('one_time', 'One-time Service'),
+        ('subscription', 'Monthly Subscription'),
+        ('consultation', 'Consultation/Hourly'),
+    ]
+
+    name = models.CharField(max_length=200)
+    description = models.TextField()
+    category = models.ForeignKey(
+        ServiceCategory, on_delete=models.CASCADE, related_name='services')
+    service_type = models.CharField(max_length=20, choices=SERVICE_TYPES)
+    base_price = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True)
+    hourly_rate = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True)
+    subscription_price = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True)
+    estimated_hours = models.PositiveIntegerField(null=True, blank=True)
+    is_available = models.BooleanField(default=True)
+
+    # For your specific services
+    is_featured = models.BooleanField(default=False)
+    includes = models.TextField(blank=True)  # What's included
+    deliverables = models.TextField(blank=True)  # What client receives
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-is_featured', 'name']
+
+    def __str__(self):
+        return self.name
+
+    @property
+    def display_price(self):
+        if self.service_type == 'one_time' and self.base_price:
+            return f"${self.base_price} one-time"
+        elif self.service_type == 'subscription' and self.subscription_price:
+            return f"${self.subscription_price}/month"
+        elif self.service_type == 'consultation' and self.hourly_rate:
+            return f"${self.hourly_rate}/hour"
+        return "Contact for pricing"
+
+
+class ServiceRequest(models.Model):  # Instead of Cart
+    STATUS_CHOICES = [
+        ('draft', 'Draft'),
+        ('submitted', 'Submitted'),
+        ('reviewing', 'Reviewing'),
+        ('quoted', 'Quoted'),
+        ('approved', 'Approved'),
+        ('in_progress', 'In Progress'),
+        ('completed', 'Completed'),
+        ('cancelled', 'Cancelled'),
+    ]
+
+    client = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='service_requests')
+    service = models.ForeignKey(Service, on_delete=models.CASCADE)
+    status = models.CharField(
+        max_length=20, choices=STATUS_CHOICES, default='draft')
+
+    # Custom details for the request
+    business_name = models.CharField(max_length=200, blank=True)
+    business_description = models.TextField(blank=True)
+    specific_needs = models.TextField(blank=True)
+    timeline = models.CharField(max_length=100, blank=True)
+    budget_range = models.CharField(max_length=100, blank=True)
+
+    # For consultations
+    preferred_date = models.DateField(null=True, blank=True)
+    preferred_time = models.CharField(max_length=50, blank=True)
+    duration_hours = models.PositiveIntegerField(default=1)
+
+    # For quotes
+    quoted_price = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True)
+    final_price = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.client.email} - {self.service.name}"

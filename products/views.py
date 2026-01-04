@@ -1,70 +1,27 @@
-from rest_framework import generics, permissions, filters
-from rest_framework.response import Response
-from django_filters.rest_framework import DjangoFilterBackend
-from .models import Category, Product, Review
-from .serializers import CategorySerializer, ProductSerializer, ReviewSerializer
+from rest_framework import generics, permissions
+from .models import ServiceCategory, Service
+from .serializers import ServiceCategorySerializer, ServiceSerializer
 
+class ServiceCategoryList(generics.ListAPIView):
+    queryset = ServiceCategory.objects.all()
+    serializer_class = ServiceCategorySerializer
+    permission_classes = [permissions.AllowAny]
 
-class CategoryListCreateView(generics.ListCreateAPIView):
-    queryset = Category.objects.all()
-    serializer_class = CategorySerializer
-    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
-
-    def get_permissions(self):
-        if self.request.method == 'POST':
-            return [permissions.IsAdminUser()]
-        return super().get_permissions()
-
-
-class CategoryDetailView(generics.RetrieveAPIView):
-    queryset = Category.objects.all()
-    serializer_class = CategorySerializer
-    lookup_field = 'id'
-
-
-class ProductListView(generics.ListCreateAPIView):
-    queryset = Product.objects.filter(is_available=True)
-    serializer_class = ProductSerializer
-    filter_backends = [DjangoFilterBackend,
-                       filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['category', 'is_available']
-    search_fields = ['name', 'description']
-    ordering_fields = ['price', 'created_at', 'name']
-    ordering = ['-created_at']
-
-    def get_permissions(self):
-        if self.request.method == 'POST':
-            return [permissions.IsAdminUser()]
-        return [permissions.AllowAny()]
-
-
-class ProductDetailView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = Product.objects.all()
-    serializer_class = ProductSerializer
-    lookup_field = 'id'
-    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
-
-    def get_permissions(self):
-        if self.request.method in ['PUT', 'PATCH', 'DELETE']:
-            return [permissions.IsAdminUser()]
-        return [permissions.AllowAny()]
-
-
-class ProductSearchView(generics.ListAPIView):
-    queryset = Product.objects.filter(is_available=True)
-    serializer_class = ProductSerializer
-    filter_backends = [filters.SearchFilter]
-    search_fields = ['name', 'description']
-
-
-class ReviewListView(generics.ListCreateAPIView):
-    serializer_class = ReviewSerializer
-    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
-
+class ServiceList(generics.ListAPIView):
+    serializer_class = ServiceSerializer
+    permission_classes = [permissions.AllowAny]
+    
     def get_queryset(self):
-        product_id = self.kwargs.get('product_id')
-        return Review.objects.filter(product_id=product_id)
-
-    def perform_create(self, serializer):
-        product_id = self.kwargs.get('product_id')
-        serializer.save(product_id=product_id)
+        queryset = Service.objects.filter(is_available=True)
+        
+        # Filter by service type if provided
+        service_type = self.request.query_params.get('type', None)
+        if service_type:
+            queryset = queryset.filter(service_type=service_type)
+        
+        # Filter featured if requested
+        featured = self.request.query_params.get('featured', None)
+        if featured and featured.lower() == 'true':
+            queryset = queryset.filter(is_featured=True)
+        
+        return queryset
